@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: kanggo-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: task_management_system
+      MYSQL_USER: kanggo
+      MYSQL_PASSWORD: kanggo123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/schema.sql:/tmp/schema.sql
+      - ./docker/mysql-init.sh:/docker-entrypoint-initdb.d/01-init.sh
+    networks:
+      - kanggo-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
+    container_name: kanggo-dragonfly
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    ulimits:
+      memlock: -1
+    command: ["--proactor_threads=2", "--maxmemory=1G"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - kanggo-network
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kanggo-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      APP_PORT: 5000
+      DATABASE_URL: mysql://root:password@mysql:3306/task_management_system
+      REDIS_URL: redis://redis:6379
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: password
+      DB_NAME: task_management_system
+      JWT_ACCESS_SECRET: your-access-secret-key-change-in-production
+      JWT_REFRESH_SECRET: your-refresh-secret-key-change-in-production
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      COOKIE_DOMAIN: .awanbox.biz.id
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kanggo-network
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 15
+      start_period: 300s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://backend:5000
+    container_name: kanggo-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: http://backend:5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - kanggo-network
+
+networks:
+  kanggo-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
