@@ -1,5 +1,7 @@
 // API Configuration
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://kanggo-be.awanbox.biz.id'
+export const API_BASE_URL = typeof window !== 'undefined'
+  ? ''
+  : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000')
 export const API_TIMEOUT = 30000
 
 // Auth Configuration

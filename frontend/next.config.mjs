@@ -16,6 +16,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${process.env.API_BASE_URL || 'http://backend:5000'}/api/:path*`,
+      },
+    ]
+  },
 }
 
 export default nextConfig
