@@ -37,6 +37,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Common ignores
 node_modules/
 .next/
+.env
 .env*.local
 .DS_Store
 .vscode
